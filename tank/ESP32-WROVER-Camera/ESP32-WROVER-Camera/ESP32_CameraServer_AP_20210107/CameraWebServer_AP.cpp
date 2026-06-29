@@ -130,3 +130,27 @@ void CameraWebServer_AP::CameraWebServer_AP_Init(void)
   Serial.print(WiFi.softAPIP());
   Serial.println("' to connect");
 }
+
+bool CameraWebServer_AP::connectToRouter(const char *ssid, const char *password, unsigned long timeoutMs)
+{
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+
+  Serial.print("Connecting to ");
+  Serial.print(ssid);
+
+  unsigned long start = millis();
+  while (WiFi.status() != WL_CONNECTED) {
+    if (millis() - start >= timeoutMs) {
+      Serial.println("\r\nWiFi connection timed out");
+      return false;
+    }
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println();
+  Serial.print("Connected, IP: ");
+  Serial.println(WiFi.localIP());
+  return true;
+}
