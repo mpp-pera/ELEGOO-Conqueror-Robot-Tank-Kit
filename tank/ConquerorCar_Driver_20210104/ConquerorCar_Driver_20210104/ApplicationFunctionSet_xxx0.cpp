@@ -326,6 +326,19 @@ void ApplicationFunctionSet::ApplicationFunctionSet_SensorDataUpdate(void)
     }
   }
 
+  { /* Battery voltage report to ESP32 every 10 real minutes */
+    static unsigned long VoltageReport_time = 0;
+    if (_millis() - VoltageReport_time > 2400000UL) // 10min * 60s * 1000ms * TimeCompensation(4)
+    {
+      VoltageReport_time = _millis();
+      char buf[8];
+      dtostrf(VoltageData_V, 4, 2, buf);
+      Serial.print("{\"V\":");
+      Serial.print(buf);
+      Serial.print("}");
+    }
+  }
+
   // { /*避障状态更新*/
   //   AppULTRASONIC.DeviceDriverSet_ULTRASONIC_Get(&UltrasoundData_cm /*out*/);
   //   UltrasoundDetectionStatus = function_xxx(UltrasoundData_cm, 0, ObstacleDetection);

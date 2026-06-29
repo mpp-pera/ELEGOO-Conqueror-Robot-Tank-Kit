@@ -77,6 +77,15 @@ def list_devices() -> list[sqlite3.Row]:
         return conn.execute("SELECT * FROM devices ORDER BY registered_at DESC").fetchall()
 
 
+def update_device_meta(device_id: str, updates: dict) -> None:
+    with get_db() as conn:
+        row = conn.execute("SELECT meta FROM devices WHERE id = ?", (device_id,)).fetchone()
+        if row:
+            meta = json.loads(row["meta"] or "{}")
+            meta.update(updates)
+            conn.execute("UPDATE devices SET meta = ? WHERE id = ?", (json.dumps(meta), device_id))
+
+
 def set_device_offline(device_id: str) -> None:
     with get_db() as conn:
         conn.execute("UPDATE devices SET status = 'offline' WHERE id = ?", (device_id,))

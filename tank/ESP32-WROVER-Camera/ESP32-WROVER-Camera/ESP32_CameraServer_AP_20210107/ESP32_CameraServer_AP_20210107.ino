@@ -14,6 +14,8 @@
 #include "esp_camera.h"
 
 static const char *DEVICE_ID = "tank-01";
+static bool g_staMode = false;
+static volatile float g_batteryV = 0.0;
 
 void heartbeatTask(void *pvParameters) {
   for (;;) {
@@ -39,6 +41,62 @@ void heartbeatTask(void *pvParameters) {
     vTaskDelay(pdMS_TO_TICKS(60UL * 1000UL));  // TODO: change back to 30min: 30UL * 60UL * 1000UL
   }
 }
+void telemetryTask(void *pvParameters) {
+  for (;;) {
+    vTaskDelay(pdMS_TO_TICKS(10UL * 60UL * 1000UL));  // 10 minutes
+    if (WiFi.status() == WL_CONNECTED) {
+      HTTPClient http;
+      String url = "http://" + String(HUB_HOST) + ":" + String(HUB_PORT) + "/api/message";
+      http.begin(url);
+      http.addHeader("Content-Type", "application/json");
+
+      char body[160];
+      snprintf(body, sizeof(body),
+        "{\"type\":\"telemetry\",\"device_id\":\"%s\",\"ts\":%.3f,\"payload\":{\"battery_v\":%.2f}}",
+        DEVICE_ID, millis() / 1000.0, (float)g_batteryV);
+
+      int code = http.POST(body);
+      if (code > 0) {
+        Serial.printf("[telemetry] sent ok (%d), battery: %.2fV\n", code, (float)g_batteryV);
+      } else {
+        Serial.printf("[telemetry] failed: %s\n", http.errorToString(code).c_str());
+      }
+      http.end();
+    } else {
+      Serial.println("[telemetry] WiFi not connected, skipping");
+    }
+  }
+}
+
+void readSerial2() {
+  static String buf;
+  static bool inFrame = false;
+
+  while (Serial2.available()) {
+    char c = Serial2.read();
+    if (c == '{') {
+      inFrame = true;
+      buf = "{";
+    } else if (inFrame) {
+      buf += c;
+      if (c == '}') {
+        inFrame = false;
+        if (buf.indexOf("\"V\":") >= 0) {
+          int colon = buf.indexOf(':');
+          int brace = buf.lastIndexOf('}');
+          if (colon >= 0 && brace > colon) {
+            String valStr = buf.substring(colon + 1, brace);
+            valStr.trim();
+            g_batteryV = valStr.toFloat();
+            Serial.printf("[serial2] battery update: %.2fV\n", (float)g_batteryV);
+          }
+        }
+        buf = "";
+      }
+    }
+  }
+}
+
 WiFiServer server(100);
 
 #define RXD2 33
@@ -225,9 +283,11 @@ void setup()
 
   Serial.println("[setup] attempting WiFi STA connection...");
   if (CameraWebServerAP.connectToRouter(HOME_SSID, HOME_PASSWORD, 10000)) {
+    g_staMode = true;
     Serial.println("[setup] STA mode active");
     xTaskCreate(heartbeatTask, "heartbeat", 8192, NULL, 1, NULL);
-    Serial.println("[setup] heartbeat task started (every 30 min)");
+    xTaskCreate(telemetryTask, "telemetry", 8192, NULL, 1, NULL);
+    Serial.println("[setup] heartbeat + telemetry tasks started");
   } else {
     Serial.println("[setup] STA failed, falling back to AP mode");
     CameraWebServerAP.setupAP();
@@ -250,8 +310,12 @@ void setup()
 }
 void loop()
 {
-  SocketServer_Test();
-  FactoryTest();
+  if (g_staMode) {
+    readSerial2();
+  } else {
+    SocketServer_Test();
+    FactoryTest();
+  }
 }
 
 /*

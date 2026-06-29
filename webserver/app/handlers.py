@@ -18,3 +18,11 @@ async def handle_heartbeat(pkt: Packet) -> Packet:
     if not db.update_heartbeat(pkt.device_id):
         return error_packet(pkt, "device not registered")
     return make_response(pkt, "heartbeat_ack")
+
+
+@handler("telemetry")
+async def handle_telemetry(pkt: Packet) -> Packet:
+    battery_v = pkt.payload.get("battery_v")
+    if battery_v is not None:
+        db.update_device_meta(pkt.device_id, {"battery_v": round(float(battery_v), 2)})
+    return make_response(pkt, "telemetry_ack")
