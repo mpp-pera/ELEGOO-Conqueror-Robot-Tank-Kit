@@ -36,7 +36,7 @@ void heartbeatTask(void *pvParameters) {
     } else {
       Serial.println("[heartbeat] WiFi not connected, skipping");
     }
-    vTaskDelay(pdMS_TO_TICKS(30UL * 60UL * 1000UL));  // 30 minutes
+    vTaskDelay(pdMS_TO_TICKS(60UL * 1000UL));  // TODO: change back to 30min: 30UL * 60UL * 1000UL
   }
 }
 WiFiServer server(100);
@@ -214,7 +214,7 @@ void FactoryTest(void)
 void setup()
 {
   Serial.begin(9600);
-  delay(2000);  // let USB serial settle before printing
+  delay(500);  // let USB serial settle before printing
   Serial.println("[setup] started");
 
   Serial2.begin(9600, SERIAL_8N1, RXD2, TXD2);
